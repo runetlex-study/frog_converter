@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOCX Summarizer — Конвертер и суммаризатор</title>
+    <meta name="description" content="Пакетная конвертация DOCX в TXT и суммаризация через ИИ. До 20 файлов за раз.">
+    <style>
+        :root {
+            --primary: #0056b3;
+            --primary-dark: #004494;
+            --primary-light: #e3f0fc;
+            --bg: #f0f4f9;
+            --card-bg: #ffffff;
+            --text: #2c3e50;
+            --muted: #6c7a8d;
+            --success: #4ade80;
+            --error: #f87171;
+            --info: #60a5fa;
+            --warn: #fbbf24;
+            --border-radius: 12px;
+            --shadow: 0 4px 24px rgba(0, 86, 179, 0.10);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 20px 60px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            max-width: 640px;
+            width: 100%;
+            padding: 40px 36px 36px;
+        }
+
+        /* ── Header ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            margin-bottom: 8px;
+        }
+
+        .frog {
+            width: 72px;
+            height: 72px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 8px rgba(0, 86, 179, 0.15));
+            transition: transform 0.3s ease;
+        }
+
+        .frog:hover {
+            transform: scale(1.08) rotate(-3deg);
+        }
+
+        .header-text h1 {
+            font-size: 24px;
+            color: var(--primary);
+            line-height: 1.2;
+        }
+
+        .header-text p {
+            font-size: 13px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        /* ── Upload zone ── */
+        .upload-zone {
+            border: 2px dashed var(--primary);
+            border-radius: var(--border-radius);
+            background: var(--primary-light);
+            padding: 32px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.25s, border-color 0.25s;
+            margin-top: 28px;
+            display: block;
+            width: 100%;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            background: #cce0f7;
+            border-color: var(--primary-dark);
+        }
+
+        .upload-zone .icon {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .upload-zone .zone-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary);
+            display: block;
+        }
+
+        #fileCount {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--muted);
+            background: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* ── Buttons ── */
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 13px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.25s, opacity 0.25s, transform 0.1s;
+            width: 100%;
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--primary-light);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, #0073e6, #0056b3);
+            color: white;
+        }
+
+        .btn-accent:hover:not(:disabled) {
+            background: linear-gradient(135deg, #005cc0, #004494);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Log ── */
+        #log {
+            margin-top: 24px;
+            background: #1e2433;
+            color: #c9d1e3;
+            border-radius: 10px;
+            padding: 14px 16px;
+            height: 210px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            display: none;
+        }
+
+        .log-entry {
+            padding: 2px 0 4px;
+            border-bottom: 1px solid #2a3145;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .success {
+            color: var(--success);
+        }
+
+        .error {
+            color: var(--error);
+        }
+
+        .info {
+            color: var(--info);
+        }
+
+        .warn {
+            color: var(--warn);
+        }
+
+        /* ── Footer ── */
+        .footer-note {
+            margin-top: 16px;
+            font-size: 12px;
+            color: var(--muted);
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+
+        <!-- Header with frog mascot -->
+        <div class="header">
+            <img src="/static/frog.png" alt="Лягушка-помощник" class="frog" id="frogImg">
+            <div class="header-text">
+                <h1>DOCX Summarizer</h1>
+                <p>Конвертация DOCX → TXT и суммаризация через ИИ</p>
+            </div>
+        </div>
+
+        <!-- Upload zone -->
+        <input type="file" id="fileInput" accept=".docx" multiple>
+        <label class="upload-zone" id="dropZone" for="fileInput">
+            <span class="icon">📂</span>
+            <span class="zone-label">Выбрать файлы DOCX</span>
+            <div id="fileCount">Файлы не выбраны</div>
+        </label>
+
+        <!-- Action buttons -->
+        <div class="actions">
+            <button id="convertBtn" class="btn btn-primary" disabled>
+                ⚙️ Конвертировать
+            </button>
+            <button id="downloadTxtBtn" class="btn btn-secondary hidden">
+                📥 Скачать TXT
+            </button>
+            <button id="summarizeBtn" class="btn btn-accent hidden">
+                🤖 Отправить на суммаризацию
+            </button>
+            <button id="downloadCsvBtn" class="btn btn-secondary hidden">
+                📊 Скачать таблицу (CSV)
+            </button>
+        </div>
+
+        <!-- Log -->
+        <div id="log"></div>
+        <p class="footer-note">Максимум 20 файлов · до 10 МБ каждый · ответ суммаризации на русском</p>
+    </div>
+
+    <script>
+        // ── DOM refs ──────────────────────────────────────────────────────────
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const fileCount = document.getElementById('fileCount');
+        const convertBtn = document.getElementById('convertBtn');
+        const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+        const summarizeBtn = document.getElementById('summarizeBtn');
+        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+        const logArea = document.getElementById('log');
+        const frogImg = document.getElementById('frogImg');
+
+        // ── State ─────────────────────────────────────────────────────────────
+        let selectedFiles = [];   // File objects from input
+        let convertedZipBlob = null;
+        let summariesCsvBlob = null;
+
+        const MAX_FILES = 20;
+
+        // ── Utilities ─────────────────────────────────────────────────────────
+        function log(msg, type = 'info') {
+            logArea.style.display = 'block';
+            const div = document.createElement('div');
+            div.className = `log-entry ${type}`;
+            div.textContent = msg;
+            logArea.appendChild(div);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function clearLog() {
+            logArea.innerHTML = '';
+            logArea.style.display = 'none';
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function setSpinner(btn, text, loading) {
+            btn.innerHTML = '';
+            if (loading) {
+                const sp = document.createElement('div');
+                sp.className = 'spinner';
+                btn.appendChild(sp);
+            }
+            const span = document.createElement('span');
+            span.textContent = text;
+            btn.appendChild(span);
+            btn.disabled = loading;
+        }
+
+        // Frog wiggle on activity
+        function wiggleFrog() {
+            frogImg.style.transform = 'scale(1.15) rotate(6deg)';
+            setTimeout(() => frogImg.style.transform = '', 400);
+        }
+
+        // ── File selection ────────────────────────────────────────────────────
+        function handleFileSelect(files) {
+            selectedFiles = Array.from(files).slice(0, MAX_FILES);
+            if (Array.from(files).length > MAX_FILES) {
+                alert(`Выбрано более ${MAX_FILES} файлов. Будут обработаны только первые ${MAX_FILES}.`);
+            }
+
+            // Reset state when new files selected
+            convertedZipBlob = null;
+            summariesCsvBlob = null;
+            downloadTxtBtn.classList.add('hidden');
+            summarizeBtn.classList.add('hidden');
+            downloadCsvBtn.classList.add('hidden');
+            clearLog();
+
+            if (selectedFiles.length > 0) {
+                fileCount.textContent = `Выбрано файлов: ${selectedFiles.length}`;
+                convertBtn.disabled = false;
+                convertBtn.textContent = '⚙️ Конвертировать';
+            } else {
+                fileCount.textContent = 'Файлы не выбраны';
+                convertBtn.disabled = true;
+            }
+        }
+
+        fileInput.addEventListener('change', e => handleFileSelect(e.target.files));
+
+        // Drag-and-drop
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const docxFiles = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.docx'));
+            if (docxFiles.length === 0) { alert('Перетащите только DOCX файлы.'); return; }
+            handleFileSelect(docxFiles);
+        });
+
+        // ── Convert ───────────────────────────────────────────────────────────
+        convertBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+            wiggleFrog();
+            clearLog();
+            log(`▶ Конвертация ${selectedFiles.length} ${declFiles(selectedFiles.length)}...`);
+
+            setSpinner(convertBtn, 'Конвертирование...', true);
+
+            const formData = new FormData();
+            selectedFiles.forEach(f => formData.append('files', f));
+
+            try {
+                const res = await fetch('/convert', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err || res.statusText);
+                }
+                convertedZipBlob = await res.blob();
+                log(`✅ Конвертация завершена. Архив готов.`, 'success');
+
+                downloadTxtBtn.classList.remove('hidden');
+                summarizeBtn.classList.remove('hidden');
+                downloadCsvBtn.classList.add('hidden');
+            } catch (e) {
+                log(`❌ Ошибка конвертации: ${e.message}`, 'error');
+            } finally {
+                convertBtn.innerHTML = '⚙️ Конвертировать';
+                convertBtn.disabled = true; // re-enable only when new files selected
+            }
+        });
+
+        // ── Download TXT ──────────────────────────────────────────────────────
+        downloadTxtBtn.addEventListener('click', () => {
+            if (!convertedZipBlob) return;
+            downloadBlob(convertedZipBlob, 'converted_txts.zip');
+            log('📥 ZIP с TXT-файлами сохранён.', 'info');
+        });
+
+        // ── Summarize ─────────────────────────────────────────────────────────
+        summarizeBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+            wiggleFrog();
+            log(`▶ Отправка ${selectedFiles.length} ${declFiles(selectedFiles.length)} на суммаризацию...`);
+
+            setSpinner(summarizeBtn, `Суммаризация 0 / ${selectedFiles.length}...`, true);
+            downloadCsvBtn.classList.add('hidden');
+
+            const formData = new FormData();
+            selectedFiles.forEach(f => formData.append('files', f));
+
+            try {
+                // Update spinner text during wait
+                let dots = 0;
+                const ticker = setInterval(() => {
+                    dots = (dots + 1) % 4;
+                    const span = summarizeBtn.querySelector('span');
+                    if (span) span.textContent = `Суммаризация${'…'.repeat(dots)} (может занять до 1 мин)`;
+                }, 700);
+
+                const res = await fetch('/summarize', { method: 'POST', body: formData });
+                clearInterval(ticker);
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err || res.statusText);
+                }
+                summariesCsvBlob = await res.blob();
+                log(`✅ Суммаризация завершена. CSV готов.`, 'success');
+
+                downloadCsvBtn.classList.remove('hidden');
+            } catch (e) {
+                log(`❌ Ошибка суммаризации: ${e.message}`, 'error');
+            } finally {
+                summarizeBtn.innerHTML = '🤖 Отправить на суммаризацию';
+                summarizeBtn.disabled = false;
+            }
+        });
+
+        // ── Download CSV ──────────────────────────────────────────────────────
+        downloadCsvBtn.addEventListener('click', () => {
+            if (!summariesCsvBlob) return;
+            downloadBlob(summariesCsvBlob, 'summaries.csv');
+            log('📊 Таблица CSV сохранена.', 'info');
+        });
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+        function declFiles(n) {
+            if (n % 10 === 1 && n % 100 !== 11) return 'файл';
+            if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'файла';
+            return 'файлов';
+        }
+    </script>
+</body>
+
+</html>

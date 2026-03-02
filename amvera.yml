@@ -1,0 +1,9 @@
+meta:
+  environment: python
+  toolVersion: "3.11"
+run:
+  persistenceMount: /data
+  containerPort: 8000
+build:
+  installDependencies: true
+  buildDirectory: .
