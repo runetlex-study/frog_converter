@@ -1,4 +1,5 @@
 import sys
+import asyncio
 import traceback
 import io
 import csv
@@ -117,21 +118,21 @@ async def summarize_txt(files: list[UploadFile] = File(...)):
 
     files = files[:MAX_FILES]
 
-    rows = []
-    for upload in files:
+    async def process_one(upload: UploadFile):
         name = Path(upload.filename).stem
         try:
             raw = await upload.read()
             doc = Document(io.BytesIO(raw))
             text = "\n".join(para.text for para in doc.paragraphs).strip()
-
             summary = await call_qwen(text)
         except Exception as e:
             tb = traceback.format_exc()
             print(f"[summarize ERROR for '{name}'] {tb}", flush=True)
             summary = f"Ошибка обработки: {e}"
+        return {"Имя файла": name, "Суммаризация": summary}
 
-        rows.append({"Имя файла": name, "Суммаризация": summary})
+    # Параллельная обработка всех файлов — вместо последовательной
+    rows = list(await asyncio.gather(*[process_one(u) for u in files]))
 
     # UTF-8 with BOM + semicolons — корректно открывается в Excel с кириллицей
     csv_buffer = io.StringIO()
